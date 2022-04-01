@@ -10,7 +10,7 @@ main.exe: $(objects)
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-main.o: fuwawinutils.h errorwrapper.h
+main.o: fuwawinutils.h errorwrapper.h main.h
 fuwawinutils.o: fuwawinutils.h
 errowrapper.o: fuwawinutils.h errorwrapper.h
 
@@ -19,7 +19,6 @@ clean:
 	rm *.o
 
 .PHONY: debug release
-release: RELEASE = objects='main.o fuwawinutils.o' CFLAGS='-O3 -g0 -s -Wl,--gc-sections -ffunction-sections -fdata-sections'
-debug release: clean
-	rm main.exe
-	$(MAKE) $(RELEASE)
+release: RELEASE = objects='main.o fuwawinutils.o' CFLAGS='-O3 -g0 -s -Wl,--gc-sections -ffunction-sections -fdata-sections -D REMOVE_ERROR_WRAPPERS'
+debug release:
+	$(MAKE) $(RELEASE) -B
