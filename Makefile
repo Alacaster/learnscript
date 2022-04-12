@@ -1,18 +1,14 @@
-MAKEFLAGS = --no-builtin-rules
-.SUFFIXES:
 CFLAGS ?= -Wall -Wextra -ggdb -O0
 CC = gcc
-objects ?= main.o fuwawinutils.o errorwrapper.o
+objects ?= errorwrapper.o fuwawinutils.o main.o
 
 main.exe: $(objects)
 	$(CC) $(CFLAGS) -o $@ $(objects)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-main.o: fuwawinutils.h errorwrapper.h main.h
-fuwawinutils.o: fuwawinutils.h
-errowrapper.o: fuwawinutils.h errorwrapper.h
+$(objects): fuwawinutils.h
+main.o errorwrapper.o: errorwrapper.h
+errorwrapper.o: snippets/switches.c
+main.o: main.h
 
 .PHONY: clean
 clean:
