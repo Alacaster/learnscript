@@ -1,19 +1,35 @@
 #ifndef MAIN
 #define MAIN
 
-#define CONSOLEWIDTH 140
-#define CONSOLEHEIGHT 140
+#define UNICODE
+
 #define VERSION "alpha 0.1"
+#include "errorwrapper.h"
+#include "fuwautils.h"
+#include "consolecontrol.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <windows.h>
+#include <assert.h>
 
 BOOL WINAPI restoreHandler();
-typedef struct{
+void setUpConsole();
+
+typedef struct
+{
         HANDLE outbuffer;
         DWORD mode;
         UINT incodepage;
         UINT outcodepage;
         CONSOLE_CURSOR_INFO cursor;
         CONSOLE_FONT_INFOEX font;
+        LONG_PTR winlongstyle;
 } restore_t;
+
+typedef enum
+{
+        WIDE_CHAR = 0,
+        NARROW_CHAR
+} chartype_t;
 
 #endif
