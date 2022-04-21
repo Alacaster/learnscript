@@ -1,25 +1,15 @@
 #include "errorwrapper.h"
 
 // SETH if String Equal Then Return
-// https://en.cppreference.com/w/c/language/character_constant
-// https://docs.microsoft.com/en-us/windows/win32/learnwin32/working-with-strings
-// https://docs.microsoft.com/en-us/windows/win32/intl/unicode-and-character-set-functions
-// https://docs.microsoft.com/en-us/windows/win32/intl/character-sets
-// https://docs.microsoft.com/en-us/cpp/c-runtime-library/string-manipulation-crt?view=msvc-170
-// Is it worth combining the two switch statements into 1 even though 90% of the code needs to be seperate?
-// I say no cause this is not intended to be for a release build.
+// Currently fails if you change the console output buffer
+//TODO: update to use WriteConsole instead
+
 void winErrorCheck8(int line, ...);
 void winErrorCheck16(int line, ...);
 int getFunctionID8(char *name);
 int getFunctionID16(wchar_t *name);
 char *validateFunctionName8(char *hi);
 wchar_t *validateFunctionName16(wchar_t *hi);
-// void getXarg(int which_arg, void* string, short typesize);
-// I will only impliment this if looking for a certain flag using just strtok causes bugs for several
-// Is there a way to conditionally not link this file if something is not #defined?
-// I want to turn the epic switch statements into functions
-
-extern HANDLE out;
 
 #define SWITCHSELECTION winErrorCheck
 #define test(testt) \

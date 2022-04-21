@@ -8,7 +8,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <windows.h>
-#include <string.h>
 
 void winErrorCheck8(int line, ...);
 void winErrorCheck16(int line, ...);
