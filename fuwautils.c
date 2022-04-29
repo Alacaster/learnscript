@@ -86,3 +86,13 @@ void printBits(size_t const size, void const * const ptr)
         }
     }
 }
+
+long long countbits(long long x){
+        x -= ((x >> 1) & 0x5555555555555555);
+        x = (((x >> 2) & 0x3333333333333333) + (x & 0x3333333333333333));
+        x = (((x >> 4) + x) & 0x0f0f0f0f0f0f0f0f);
+        x += (x >> 8);
+        x += (x >> 16);
+        x += (x >> 32);
+        return(x & 0xff);
+}

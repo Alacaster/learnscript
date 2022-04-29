@@ -23,6 +23,7 @@ typedef struct
         UINT outcodepage;
         CONSOLE_CURSOR_INFO cursor;
         CONSOLE_FONT_INFOEX font;
+        CONSOLE_SCREEN_BUFFER_INFOEX info;
         LONG_PTR winlongstyle;
 } restore_t;
 

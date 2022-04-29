@@ -1,30 +1,25 @@
 #include "errorwrapper.h"
-
+#include "fuwautils.h"
+#include <wchar.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <windows.h>
 // SETH if String Equal Then Return
 // Currently fails if you change the console output buffer
 //TODO: update to use WriteConsole instead
 
-void winErrorCheck8(int line, ...);
-void winErrorCheck16(int line, ...);
 int getFunctionID8(char *name);
 int getFunctionID16(wchar_t *name);
 char *validateFunctionName8(char *hi);
 wchar_t *validateFunctionName16(wchar_t *hi);
 
 #define SWITCHSELECTION winErrorCheck
-#define test(testt) \
-    if (testt)      \
+#define test(testt)\
+    if (testt)\
     errtrue = 1
 
-void winErrorCheck8(int line, ...)
+void winErrorCheck8(int line, char *filename, void *value, char *functionname)
 {
-    va_list a;
-    va_start(a, line);
-    char *filename = va_arg(a, char *);
-    long long int value = *((long long int *)va_arg(a, void *));
-    char *functionname = va_arg(a, char *);
-    va_end(a);
-
     if (!(functionname = validateFunctionName8(functionname)))
     {
         fprintf(stderr, "\nE MACRO FAILED TO VERIFY FUNCTON NAME STRING. REALLY YOU SHOULDN'T EVER SEE THIS MESSAGE");
@@ -53,14 +48,8 @@ void winErrorCheck8(int line, ...)
     return;
 }
 
-void winErrorCheck16(int line, ...)
+void winErrorCheck16(int line, wchar_t *filename, void *value, wchar_t *functionname)
 {
-    va_list a;
-    va_start(a, line);
-    wchar_t *filename = va_arg(a, wchar_t *);
-    long long int value = *((long long int *)va_arg(a, void *));
-    wchar_t *functionname = va_arg(a, wchar_t *);
-    va_end(a);
 
     if (!(functionname = validateFunctionName16(functionname)))
     {

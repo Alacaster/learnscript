@@ -7,11 +7,13 @@
 switch (funcid) // use test() macro to use default windows error handler
 {
 case 0:
-    test(value == 0);
+    test(*(BOOL *)value == 0);
     break;
 case 1:
-    test(*((HANDLE *)((void *)&value)) == INVALID_HANDLE_VALUE);
+    test(*(HANDLE *)value == INVALID_HANDLE_VALUE);
     break;
+case 2:
+    test((((PCOORD)value)->X == 0) && (((PCOORD)value)->Y == 0));
 default:
     break;
 }
@@ -68,6 +70,7 @@ case 15:
     SETH(GetConsoleOutputCP, 0)
     break;
 case 16:
+    SETH(GetLargestConsoleWindowSize, 2)
     break;
 case 17:
     SETH(GetConsoleScreenBufferInfo, 0)
