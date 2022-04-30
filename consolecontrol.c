@@ -2,37 +2,46 @@
 #include "fuwautils.h"
 #include "errorwrapper.h"
 
-static HANDLE hconout = 0;
+static HANDLE hconout = 0; // da coconut
 static COORD virtualcursor = {0, 0}; //cursorpos gets transformed into this variable and only needs to be incremented unless the end of a box is reached or a new line or it stays the same if a scroll box moves this is where text gets printed to the screen in the input loop if all checks pass.
 //maybe we need a variable to keep track of input focus!
 CHAR_INFO * outputbuf = 0;
 COORD consolesize = {0, 0};
-static struct rects_t {
+typedef struct {
     SMALL_RECT coords;
     inputfieldstyle_t type;
     TCHAR * buf;
     int cursorpos;
-} * inrects = 0, * outrects = 0;
-static short bottomrectheight = 0;
-static short cinrects = 0, coutrects = 0; //count of 
-static int ctotalconsolecharacters = 0;
+} rects_t;
+rects_t *rects = 0, **pinrects = 0, **poutrects = 0;
+static short bottomrectheight = 0; //the lowest line that a text box is on
+static short cinrects = 0, coutrects = 0;
+static int ctotalconsolecharacters = 0; //consolesize squared
+static int cmaxconsolecharacters = 0; //largest console can be resized to
+
 static BOOL bitmapoutofdate = 1;
+static int8_t * bitmap;
+static int8_t * tempmap;
+
+typedef enum {EMPTY, FILLED, POSSIBLE_CORNER} pixeltype;
 
 void (*initializeConsoleBuffersError)(icbe_t value) = NULL;
-icbe_t initializeConsoleBuffers(HANDLE hhconout){ //TODO just allocate the max window size.
+icbe_t initializeConsoleBuffers(HANDLE hhconout, COORD sizee){
     hconout = hhconout;
     icbe_t errortype = CONSOLE_ALREADY_INITIALIZED;
     static void * jumponce = &&initialize;
     goto *jumponce;
     initialize:
     COORD size = GetLargestConsoleWindowSize(hhconout);
-    ctotalconsolecharacters = size.X*size.Y;
-    outputbuf = (CHAR_INFO *)calloc(ctotalconsolecharacters, sizeof(CHAR_INFO));
-    outrects = (struct rects_t *)calloc(ctotalconsolecharacters, sizeof(struct rects_t));
-    inrects = (struct rects_t *)calloc(ctotalconsolecharacters, sizeof(struct rects_t));
-    consolesize.X = size.X; consolesize.Y = size.Y;
+    cmaxconsolecharacters = size.X*size.Y;
+    outputbuf = (CHAR_INFO *)calloc(cmaxconsolecharacters, sizeof(CHAR_INFO));
+    rects = (rects_t *)calloc(cmaxconsolecharacters * 2, sizeof(rects_t));
+    pinrects = (rects_t **)calloc(cmaxconsolecharacters, sizeof(rects_t **));
+    poutrects = (rects_t **)calloc(cmaxconsolecharacters, sizeof(rects_t **));
+    consolesize.X = sizee.X; consolesize.Y = sizee.Y;
+    ctotalconsolecharacters = sizee.X * sizee.Y;
     bitmapoutofdate = 1;
-    if(!((int64_t)outputbuf & (int64_t)inrects & (int64_t)outrects)){
+    if(!((int64_t)outputbuf & (int64_t)rects)){
         errortype = CALLOC_FAILED;
         goto alreadyinitialized;
     }
@@ -70,7 +79,7 @@ icbe_t initializeConsoleBuffers(HANDLE hhconout){ //TODO just allocate the max w
     on only.
     we first have to define the new rect in
 */
-int resizeConsoleBuffers(COORD size){ idk bro
+int resizeConsoleBuffers(COORD size){ //idk bro
     if(consolesize.X > size.X && consolesize.Y > size.Y){
         goto norealloc;
     }
@@ -82,15 +91,6 @@ int resizeConsoleBuffers(COORD size){ idk bro
 int writeToField(); //write to any field.
 int takeInput();
 
-int getNextRect(BOOL rect_occupied, int resetswitch, recttype_t recttype){
-    static short currentrect;
-    short crects = recttype ? coutrects : cinrects;
-    if(resetswitch)
-        currentrect = 0;
-    while(currentrect < crects){
-
-    }
-}
 /*
     all structures are passed as pointers
 
@@ -302,10 +302,6 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){
             return BAD_INPUT_FIELD_FORMAT;
     } */
 }
-
-//relies on formatBox to provide exact coordinates to make the box
-//then checks for intersections but i think formatBox can do this
-//then it puts the information in the lowest available rect struct
 cife_t createInputField(_In_ inputfieldstyle_t a, _Out_ hinfield_t * b, ...){
     SMALL_RECT box = {0, 0, 0, 0};
     va_list d;
@@ -315,6 +311,14 @@ cife_t createInputField(_In_ inputfieldstyle_t a, _Out_ hinfield_t * b, ...){
     for(int i = 0; i < cinrects; i++){
         ;
     }
+}
+void deleteInputField(hinfield_t a){
+    //find the feild to delete, a is just a pointer
+    //delete it then repack the array
+}
+void clearAllFields(){
+    memset(poutrects, 0, cmaxconsolecharacters);
+    memset(pinrects, 0, cmaxconsolecharacters);
 }
 //make sure the box it's upside down or rightside left.
 void correctRect(SMALL_RECT *a, SMALL_RECT *b){
@@ -341,12 +345,42 @@ int isIntersected(SMALL_RECT *a, SMALL_RECT *b){
     return 1;
 }
 
-static int8_t * bitmap;
-static int8_t * tempmap;
-void addBitRect(); //just draws the four corners of a new rect
-void redrawRect(){
-    E(GetLargestConsoleWindowSize(hconout));
-    int bitmap = 
-}//redraws the entire bitmap, need to do this to remove a rect or resize the buffer
-void getBiggestRect();
+void editBitRect(SMALL_RECT * b, pixeltype c){ //just draws the four corners of a rect
+    int a = consolesize.X * b->Top;
+    *(bitmap + b->Left + a) = c;
+    *(bitmap + b->Right + a) = c;
+    a = consolesize.X * b->Bottom;
+    *(bitmap + b->Left + a) = c;
+    *(bitmap + b->Right + a) = c;
+}
+void drawBitRect(recttype_t recttype){ //redraws the entire bitmap, need to do this to remove a rect or resize the buffer
+    static COORD size;
+    static void * jumponce = &&initialize;
+    goto *jumponce;
+    initialize:
+    size = E(GetLargestConsoleWindowSize(hconout));
+    bitmap = malloc(cmaxconsolecharacters * sizeof(int8_t));
+    tempmap = calloc(cmaxconsolecharacters, sizeof(int8_t));
+    jumponce = &&body;
+    body:
+    memset(bitmap, 0, cmaxconsolecharacters);
+    typeof(pinrects) tprects = pinrects;
+    for(int q = 0; q < 2; q++){
+        int i = 0;
+        while(pinrects[i] != 0){
+            int a = consolesize.X * pinrects[i]->coords.Top;
+            *(bitmap + pinrects[i]->coords.Left + a) = FILLED;
+            *(bitmap + pinrects[i]->coords.Right + a) = FILLED;
+            a = consolesize.X * pinrects[i]->coords.Bottom;
+            *(bitmap + pinrects[i]->coords.Left + a) = FILLED;
+            *(bitmap + pinrects[i]->coords.Right + a) = FILLED;
+            i++;
+        }
+        tprects = poutrects;
+    }
+}
+void getBiggestRect(COORD * a){
+    memcpy(tempmap, bitmap, ctotalconsolecharacters);
+
+};
 void getWidestLine();

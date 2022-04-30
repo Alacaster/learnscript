@@ -9,7 +9,7 @@
 
 typedef enum {CONSOLE_INITIALIZED_SUCCESS, CONSOLE_ALREADY_INITIALIZED, CALLOC_FAILED} icbe_t;
 extern void (*initializeConsoleBuffersError)(icbe_t value);
-icbe_t initializeConsoleBuffers(HANDLE hhconout);
+icbe_t initializeConsoleBuffers(HANDLE hhconout, COORD sizee);
 
 
 typedef int houtfield_t; //unfinished
