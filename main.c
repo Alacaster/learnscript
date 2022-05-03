@@ -8,7 +8,7 @@ HWND hconsole;
 int main()
 {
     setUpConsole();
-    DWORD read;
+    // DWORD read;
     INPUT_RECORD ir;
     memset(&ir, 0, sizeof(ir));
     /* while(1){
@@ -36,11 +36,11 @@ void setUpConsole(){
         E(GetWindowLong(hconsole, GWL_STYLE))}; //winlongstyle
     CONSOLE_SCREEN_BUFFER_INFOEX x = {
         sizeof(CONSOLE_SCREEN_BUFFER_INFOEX),
-        {CONSOLEWIDTH, CONSOLEHEIGHT},
+        {80, 20},
         {0, 0},
         FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY,
         {0, 0, 100, 50},
-        {CONSOLEWIDTH, CONSOLEHEIGHT},
+        {80, 20},
         0,
         FALSE,
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};

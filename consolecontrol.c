@@ -3,7 +3,7 @@
 #include "errorwrapper.h"
 
 static HANDLE hconout = 0; // da coconut
-static COORD virtualcursor = {0, 0}; //cursorpos gets transformed into this variable and only needs to be incremented unless the end of a box is reached or a new line or it stays the same if a scroll box moves this is where text gets printed to the screen in the input loop if all checks pass.
+static COORD virtualcursor = {0, 0}; //cursorpos gets transformed into this variable and onlx needs to be incremented unless the end of a box is reached or a new line or it stays the same if a scroll box moves this is where text gets printed to the screen in the input loop if all checks pass.
 //maybe we need a variable to keep track of input focus!
 CHAR_INFO * outputbuf = 0;
 COORD consolesize = {0, 0};
@@ -22,8 +22,11 @@ static int cmaxconsolecharacters = 0; //largest console can be resized to
 static BOOL bitmapoutofdate = 1;
 static int8_t * bitmap;
 static int8_t * tempmap;
-
-typedef enum {EMPTY, FILLED, POSSIBLE_CORNER} pixeltype;
+struct {
+    int32_t valid;
+    COORD pos;
+} * pinklist; //pink was the color of the pixels when i was drawing to invent the algorithm
+typedef enum {EMPTY = 0, FILLED, GREY, POSSIBLE_CORNER, USED_CORNER} pixeltype;
 
 void (*initializeConsoleBuffersError)(icbe_t value) = NULL;
 icbe_t initializeConsoleBuffers(HANDLE hhconout, COORD sizee){
@@ -135,12 +138,12 @@ int takeInput();
 */
 
 #define ifa(b) if(a & (b)) //if is any
-#define ifn(b) if(!(a & b)) //if is none
+#define ifn(b) if(!(a & (b))) //if is none
 #define ife(b) if(!(a ^ (b))) //if is exactly
-#define ifaom(b) if(!((a & b) ^ (b))) //if is all or more
+#define ifaom(b) if(!((a & (b)) ^ (b))) //if is all or more
 #define ifoa(b) if((!(a & ~(b)) && a)) //if is only any
 #define ifnoo(b) if(!((a & (b)) & ((a & (b)) - 1))) //if is not only one
-static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){
+static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){ //TODO check for invaid coordinates such as negatives or too large
     union {
         SMALL_RECT *rect;
         struct {
@@ -151,7 +154,7 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){
         COORD *fill;
         COORD *WxH;
     } d;
-    short width = 0;
+    int width = 0;
     int a = *A & LINEIN | BOXIN | MORE_FORMAT | CENTER_FIELD | FILL;
     SMALL_RECT e = {0,0,0,0};
     ifa(LINEIN | BOXIN){ //has LINEIN or BOXIN at least
@@ -167,22 +170,18 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){
                 e.Bottom -= va_arg(c, short) - 1;
                 bottomrectheight = e.Bottom;
             } //has BOXIN or LINEIN and something else too
-            return 0;
         }else ifa(LINEIN){
             ifnoo(CENTER_FIELD | MORE_FORMAT | FILL){
                 return BAD_INPUT_FIELD_FORMAT; //has only LINEIN and one of the above
             }else ifa(CENTER_FIELD){
                 width = va_arg(c, typeof(width));
-                return 0;
+                goto centerfield;
             }else ifa(MORE_FORMAT){
                 //get coord and two shorts
 
-                return 0;
             }else ifa(FILL){//all cases are finished for LINEIN
                 //fill that hoe
 
-
-                return 0;
             }
         }else{ //has BOXIN and some extra stuff
             ifn(MORE_FORMAT | FILL){
@@ -191,9 +190,9 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){
                 e.Left = 0;
                 e.Right = width = d.WxH->X;
                 e.Bottom -= d.WxH->Y;
-                goto centerfield;
             } //past this BOXIN has no effect on anything
         }
+        goto loadrect;
     }
     // we have no LINEIN
     ifoa(MORE_FORMAT | BOXIN | CENTER_FIELD){
@@ -211,16 +210,16 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){
             e.Left = consolesize.X / 2 - width / 2; //rounds left when parity does not match
             e.Right = e.Left + width;
         }
-        return 0;
+        goto loadrect;
     }
     ifoa(FILL | BOXIN | MORE_FORMAT){
         ifa(MORE_FORMAT){
             d.rect = va_arg(c, typeof(d.rect));
 
-
         }
         //do normal fill
-
+        loadrect:
+        b->Top = e.Top; b->Bottom = e.Bottom; b->Left = e.Left; b->Right = e.Right;
         return 0;
     }
     return BAD_INPUT_FIELD_FORMAT;
@@ -321,8 +320,9 @@ void clearAllFields(){
     memset(pinrects, 0, cmaxconsolecharacters);
 }
 //make sure the box it's upside down or rightside left.
+#define flip(a, b, temp) do{{temp = (a) ^ (b); a ^= temp; b ^= temp;}} while(0)
 void correctRect(SMALL_RECT *a, SMALL_RECT *b){
-    short temp;
+    short temp = 0;
     if(a->Top < a->Bottom)
         flip(a->Top, a->Bottom, temp);
     if(a->Right < a->Left)
@@ -334,7 +334,6 @@ void correctRect(SMALL_RECT *a, SMALL_RECT *b){
 }
 //switch two variables using a difference map i.e. XOR
 //XOR shows the differences, then XOR applies those differences.
-#define flip(a, b, temp) do{{temp = (a) ^ (b); a ^= temp; b ^= temp;}} while(0)
 //it's imposible for the rectangles to be intersected if the lowest point
 //of one box is above the highest point of the other box. 
 //The boxes must not have inverted coordinates
@@ -361,26 +360,62 @@ void drawBitRect(recttype_t recttype){ //redraws the entire bitmap, need to do t
     size = E(GetLargestConsoleWindowSize(hconout));
     bitmap = malloc(cmaxconsolecharacters * sizeof(int8_t));
     tempmap = calloc(cmaxconsolecharacters, sizeof(int8_t));
+    pinklist = calloc(2 * (consolesize.X  + consolesize.Y), sizeof(pinklist));
     jumponce = &&body;
     body:
-    memset(bitmap, 0, cmaxconsolecharacters);
+    memset(bitmap, 0, ctotalconsolecharacters);
     typeof(pinrects) tprects = pinrects;
     for(int q = 0; q < 2; q++){
         int i = 0;
-        while(pinrects[i] != 0){
-            int a = consolesize.X * pinrects[i]->coords.Top;
-            *(bitmap + pinrects[i]->coords.Left + a) = FILLED;
-            *(bitmap + pinrects[i]->coords.Right + a) = FILLED;
-            a = consolesize.X * pinrects[i]->coords.Bottom;
-            *(bitmap + pinrects[i]->coords.Left + a) = FILLED;
-            *(bitmap + pinrects[i]->coords.Right + a) = FILLED;
+        while(tprects[i] != 0){ //assumes that pinrects and poutrects are a packed array of pointers to rect structures and all invalid pointers are null
+            int a = consolesize.X * tprects[i]->coords.Top;
+            *(bitmap + tprects[i]->coords.Left + a) = FILLED;
+            *(bitmap + tprects[i]->coords.Right + a) = FILLED;
+            a = consolesize.X * tprects[i]->coords.Bottom;
+            *(bitmap + tprects[i]->coords.Left + a) = FILLED;
+            *(bitmap + tprects[i]->coords.Right + a) = FILLED;
             i++;
         }
         tprects = poutrects;
     }
 }
-void getBiggestRect(COORD * a){
+enum {UP = 0x1, DOWN = 0x2, LEFT = 0x4, RIGHT = 0x8};
+void getBiggestRect(COORD * ina){
     memcpy(tempmap, bitmap, ctotalconsolecharacters);
-
+    COORD pos;
+    pos.X = ina->X; pos.Y = ina->Y;
+    for(int y = 0; y < consolesize.Y; y++){
+        for(int x = 0; x < consolesize.X; x++){
+            if(*(tempmap + x + y * consolesize.X) != FILLED){ //if the pixel is not filled then don't do this
+                continue;
+            }
+            void makeline(short xo, short yo){
+                register int ty = y;
+                register int tx = x;
+                while(ty >= 0 && tx >= 0 && ty < consolesize.Y && tx < consolesize.X){
+                    if(*(tempmap + tx + ty * consolesize.X) == EMPTY){
+                        *(tempmap + tx + ty * consolesize.X) = GREY;
+                    } //we use grey to avoid doing unnecessary stuff.
+                    tx += xo;
+                    ty += yo;
+                }
+                x = tx;
+                y = ty;
+            }
+            if(y >= pos.Y){     //if pixel is inline then draw both directions
+                makeline(0, 1);
+            }
+            if(y <= pos.Y){
+                makeline(0, -1);
+            }
+            if(x >= pos.X){
+                makeline(1, 0);
+            }
+            if(x <= pos.X){
+                makeline(-1, 0);
+            }
+        }
+    }
 };
 void getWidestLine();
+

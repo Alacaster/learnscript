@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
-#include <assert.h>
 
 BOOL WINAPI restoreHandler();
 void setUpConsole();

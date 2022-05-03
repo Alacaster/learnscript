@@ -5,7 +5,7 @@
 
 #include <windows.h>
 #include <inttypes.h>
-#include <varargs.h>
+#include <stdarg.h>
 
 typedef enum {CONSOLE_INITIALIZED_SUCCESS, CONSOLE_ALREADY_INITIALIZED, CALLOC_FAILED} icbe_t;
 extern void (*initializeConsoleBuffersError)(icbe_t value);
@@ -27,6 +27,6 @@ typedef PSMALL_RECT hstructure_t;
 typedef enum {HORIZONTAL_PARTITION, VERTICAL_PARTITION} structurestyle_t;
 
 typedef enum {STRUCTURE_SUCCESS, STRUCTURE_OVERLAP} cbse_t;
-cbse_t createBoxStructure(SMALL_RECT a)
+cbse_t createBoxStructure(SMALL_RECT a);
 
 #endif
