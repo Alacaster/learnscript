@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <math.h>
 
 typedef enum {CONSOLE_INITIALIZED_SUCCESS, CONSOLE_ALREADY_INITIALIZED, CALLOC_FAILED} icbe_t;
 extern void (*initializeConsoleBuffersError)(icbe_t value);

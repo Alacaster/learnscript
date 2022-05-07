@@ -7,6 +7,7 @@ static COORD virtualcursor = {0, 0}; //cursorpos gets transformed into this vari
 //maybe we need a variable to keep track of input focus!
 CHAR_INFO * outputbuf = 0;
 COORD consolesize = {0, 0};
+//the console is in the positive X positive Y
 typedef struct {
     SMALL_RECT coords;
     inputfieldstyle_t type;
@@ -21,11 +22,7 @@ static int cmaxconsolecharacters = 0; //largest console can be resized to
 
 static BOOL bitmapoutofdate = 1;
 static int8_t * bitmap;
-static int8_t * tempmap;
-struct {
-    int32_t valid;
-    COORD pos;
-} * pinklist; //pink was the color of the pixels when i was drawing to invent the algorithm
+static int8_t ** pinklist; //pink was the color of the pixels when i was drawing to invent the algorithm
 typedef enum {EMPTY = 0, FILLED, GREY, POSSIBLE_CORNER, USED_CORNER} pixeltype;
 
 void (*initializeConsoleBuffersError)(icbe_t value) = NULL;
@@ -107,17 +104,17 @@ int takeInput();
 
     providing only LINEIN takes no arguments.                          DONE
 
-    providing only BOXIN requires a short for height.                 DONE
+    providing only BOXIN requires a int for height.                 DONE
 
     if MORE_FORMAT alone is defined then the function expects a       DONE
     pointer to a SMALL_RECT and these dimensions are used.
 
     if MORE_FORMAT and LINEIN are defined the function
-    expects a COORD and two unsigned shorts and will try to place a 
+    expects a COORD and two unsigned ints and will try to place a 
     box of height 1, COORD is contained in the box, the box 
     attepts to be as wide as possible without exceeding the first
-    short to the left and the second short to the right from the
-    position of the COORD. If a short is negative that direction
+    int to the left and the second int to the right from the
+    position of the COORD. If a int is negative that direction
     can be infinity.
     if MORE_FORMAT and CENTER_FIELD (BOXIN optional) are defined it expects a            DONE
     SMALL_RECT and tries to center the field horizontally 
@@ -157,6 +154,7 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){ //
     int width = 0;
     int a = *A & LINEIN | BOXIN | MORE_FORMAT | CENTER_FIELD | FILL;
     SMALL_RECT e = {0,0,0,0};
+    #error "Use correctRect to verify formatting and check parameter bounds <-- TODO"
     ifa(LINEIN | BOXIN){ //has LINEIN or BOXIN at least
         ifaom(BOXIN | LINEIN){
                 return BAD_INPUT_FIELD_FORMAT;
@@ -167,7 +165,7 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){ //
             e.Right = consolesize.X;
             e.Bottom = e.Top;
             ifa(BOXIN){
-                e.Bottom -= va_arg(c, short) - 1;
+                e.Bottom -= va_arg(c, int) - 1;
                 bottomrectheight = e.Bottom;
             } //has BOXIN or LINEIN and something else too
         }else ifa(LINEIN){
@@ -177,7 +175,7 @@ static fbe_t formatBox(_In_ inputfieldstyle_t *A, SMALL_RECT * b, va_list c){ //
                 width = va_arg(c, typeof(width));
                 goto centerfield;
             }else ifa(MORE_FORMAT){
-                //get coord and two shorts
+                //get coord and two ints
 
             }else ifa(FILL){//all cases are finished for LINEIN
                 //fill that hoe
@@ -359,7 +357,6 @@ void drawBitRect(recttype_t recttype){ //redraws the entire bitmap, need to do t
     initialize:
     size = E(GetLargestConsoleWindowSize(hconout));
     bitmap = malloc(cmaxconsolecharacters * sizeof(int8_t));
-    tempmap = calloc(cmaxconsolecharacters, sizeof(int8_t));
     pinklist = calloc(2 * (consolesize.X  + consolesize.Y), sizeof(pinklist));
     jumponce = &&body;
     body:
@@ -379,12 +376,50 @@ void drawBitRect(recttype_t recttype){ //redraws the entire bitmap, need to do t
         tprects = poutrects;
     }
 }
+
+typedef struct {
+    short tl; //top left, how many come from X and go into X
+    short tr; //top right, how many come from Y and go into X
+    short bl; //bottom left
+    short br;
+} matrix2x2_t;
+
+void vectorMatrixMul(COORD * v, const matrix2x2_t m){
+    v->X = v->X * m.tl + v->Y * m.tr;
+    v->Y = v->X * m.bl + v->Y * m.br;
+}
+
 enum {UP = 0x1, DOWN = 0x2, LEFT = 0x4, RIGHT = 0x8};
 void getBiggestRect(COORD * ina){
-    memcpy(tempmap, bitmap, ctotalconsolecharacters);
-    COORD pos;
-    pos.X = ina->X; pos.Y = ina->Y;
-    for(int y = 0; y < consolesize.Y; y++){
+    memset(pinklist, 0, 2 * (consolesize.X  + consolesize.Y) * sizeof(*pinklist));
+    const COORD pos = {ina->X, ina->Y};
+    COORD tpos = pos;
+    int8_t ** plpos; //pinklist position //this points to a position to an array of int8_t pointers which point to locations of the bitmap
+    const matrix2x2_t rotCWmatx = {0, 1, -1, 0}; //rotate clockwise matrix
+    const matrix2x2_t rotCCmatx = {0, -1, 1, 0}; //rotate counterclockwise
+    const matrix2x2_t backmatx = {-1, 0, 0, -1}; //opposite direction
+    const matrix2x2_t getCoordRed = {0, 1, 1, 0}; //this gets the position of where to start the search. Aplly this matrix to red pixel coord then do absolute value, the add this
+                                                  //if offset is current (1, 0) then we will get y from the red pixel coord and x from our current coord
+    COORD vec = {1, 0};
+    //makesure red pixel is not in a box
+    #error "Checking for if the red pixel is in a box has not been implimented <-- TODO"
+    while(tpos.X < consolesize.Y && *(bitmap + tpos.X + tpos.Y * consolesize.X) == 0){
+        tpos.Y++;
+    }
+    COORD loopstart = {tpos.X, tpos.Y};
+    while(tpos.Y != loopstart.Y && tpos.X != loopstart.X){
+        //this looks complicated, but essentially it's boolean logic cause we take the abs of vec so it's always 1, 0 or 0, 1 and then the x and y of ttpos are one of two components which are choosen by multiplying by 1 or 0;
+        //this gets the coord of where to start checking
+        COORD ttpos = {(tpos.X + vec.X) * vec.X + abs((int)pos.X * (int)vec.Y), (tpos.Y + vec.Y) * vec.Y + abs((int)pos.Y * (int)vec.X)};
+        COORD lvec = vec;
+        vectorMatrixMul(&lvec, rotCCmatx);
+        #error "unfinished function at 416"
+        while(ttpos.X >= 0 && ttpos.Y >= 0 && ttpos.X < consolesize.X && ttpos.Y < consolesize.Y && *(bitmap + tpos.X + tpos.Y * consolesize.X) == 0){
+            ttpos.X += lvec.X; tpos.Y += lvec.Y;
+        }
+    }
+
+    /*for(int y = 0; y < consolesize.Y; y++){
         for(int x = 0; x < consolesize.X; x++){
             if(*(tempmap + x + y * consolesize.X) != FILLED){ //if the pixel is not filled then don't do this
                 continue;
@@ -416,6 +451,18 @@ void getBiggestRect(COORD * ina){
             }
         }
     }
-};
-void getWidestLine();
+    COORD tpos;
+    while(1){
+        int8_t * a = (tempmap + tpos.X + (tpos.Y + 1) * consolesize.X);
+        if( tpos.Y < 0 && tpos.Y >=  consolesize.Y && !(*a == FILLED || *a == GREY)){
+            break;
+        }
+        tpos.Y
+    }
+    //draw the pink line
 
+    //choose a pink pixel and expand a rectangle from that spot
+    //invalidate all pixels on its edges and in the list
+    */
+}
+void getWidestLine(); //TODO make sure red pixel is not in a box
