@@ -18,7 +18,7 @@ typedef int houtfield_t; //unfinished
 typedef int hinfield_t;
 typedef enum {LINEIN = 0x1, BOXIN = 0x2, MORE_FORMAT = 0x4, CENTER_FIELD = 0x8, FILL = 0x10, SCROLLER = 0x20, CENTER_JUSTIFY = 0x40, SELECTABLE = 0x80} inputfieldstyle_t;
 
-typedef enum {INPUT_FIELD_CREATION_SUCCESS = 1, INPUT_FIELD_OVERLAP, MAX_INPUT_FIELDS_REACHED, BAD_INPUT_FIELD_FORMAT} cife_t, fbe_t;
+typedef enum {INPUT_FIELD_CREATION_SUCCESS = 0, INPUT_FIELD_OVERLAP, MAX_INPUT_FIELDS_REACHED, BAD_INPUT_FIELD_FORMAT, NOT_ENOUGH_ROOM} cife_t, fbe_t;
 cife_t createInputField(_In_ inputfieldstyle_t a, _Out_ hinfield_t * b, ...);
 
 typedef enum {INRECTS = 0, OUTRECTS} recttype_t;
